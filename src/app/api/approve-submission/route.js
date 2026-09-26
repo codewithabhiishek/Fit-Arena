@@ -52,7 +52,7 @@ export async function POST(request) {
       const lastActiveDate = user.last_active ? user.last_active.slice(0, 10) : null;
       if (lastActiveDate !== todayDate) {
         const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
         const yesterdayDate = yesterday.toISOString().slice(0, 10);
 
         if (lastActiveDate === yesterdayDate) {

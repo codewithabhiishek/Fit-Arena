@@ -76,11 +76,6 @@ export function useChallenges(realtime = false) {
   return { challenges, loading, error, refetch: fetchChallenges };
 }
 
-function formatDeadline(date) {
-  const now  = new Date();
-  const diff = Math.round((date - now) / (1000 * 60 * 60 * 24));
-  if (diff < 0)   return "Ended";
-  if (diff === 0) return "Ends today";
-  if (diff === 1) return "1 day left";
-  return `${diff} days left`;
-}
+import { formatDeadline } from "../utils/formatters";
+
+export { formatDeadline };

@@ -129,20 +129,6 @@ function buildFallbackProfile(user) {
   };
 }
 
-function deriveInitials(name) {
-  return (name?.trim() || "??")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+import { deriveInitials, rankFromLevel } from "../utils/formatters";
 
-function rankFromLevel(level) {
-  if (level >= 20) return "Legend";
-  if (level >= 15) return "Elite";
-  if (level >= 10) return "Champion";
-  if (level >= 5)  return "Contender";
-  return "Rookie";
-}
+export { deriveInitials, rankFromLevel };

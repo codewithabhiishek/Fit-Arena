@@ -1,5 +1,5 @@
 import { db } from "../firebase/client";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
 
 const _approvingInFlight = new Set();
 const _rejectingInFlight = new Set();
@@ -147,7 +147,7 @@ export async function rejectSubmission(submissionId) {
 
 export function subscribeToSubmissions(callback) {
   const q = query(collection(db, "submissions"));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const unsubscribe = onSnapshot(q, () => {
     callback();
   });
   return unsubscribe;

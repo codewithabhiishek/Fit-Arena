@@ -6,9 +6,11 @@ export async function POST(request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let cost;
+  let cost, rewardId;
   try {
-    ({ cost } = await request.json());
+    const body = await request.json();
+    cost = body.cost;
+    rewardId = body.rewardId;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -30,6 +32,16 @@ export async function POST(request) {
       }
 
       transaction.update(userRef, { points: user.points - cost });
+
+      if (rewardId) {
+        const redemptionRef = adminDb.collection('redemptions').doc();
+        transaction.set(redemptionRef, {
+          user_id: userId,
+          reward_id: rewardId,
+          cost,
+          redeemed_at: new Date().toISOString()
+        });
+      }
     });
 
     return NextResponse.json({ success: true });

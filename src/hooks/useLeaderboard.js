@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { getLeaderboard } from "../services/userService";
 import { db } from "../firebase/client";
 import { collection, onSnapshot } from "firebase/firestore";
+import { deriveInitials } from "../utils/formatters";
 
 export function useLeaderboard(limit = 20, period = "all-time", realtime = false) {
   const [board, setBoard]     = useState([]);
@@ -16,13 +17,7 @@ export function useLeaderboard(limit = 20, period = "all-time", realtime = false
       const enriched = rows.map((u) => ({
         ...u,
         leaderboardPosition: Number(u.position),
-        initials: (u.name?.trim() || "??")
-          .split(" ")
-          .filter(Boolean)
-          .map((w) => w[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase(),
+        initials: deriveInitials(u.name),
         change: "same",
       }));
       setBoard(enriched);

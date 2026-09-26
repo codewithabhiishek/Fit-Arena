@@ -89,7 +89,7 @@ export async function deactivateChallenge(id) {
 
 export function subscribeToChallenges(callback) {
   const q = query(collection(db, "challenges"));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const unsubscribe = onSnapshot(q, () => {
     callback();
   });
   return unsubscribe;

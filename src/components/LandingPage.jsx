@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 export default function LandingPage({ onEnterAuth }) {
   const CHALLENGE_PREVIEWS = [
     { icon: "👑", title: "Pushup King", tag: "STRENGTH", color: "#39FF14", record: "120 Reps", leader: "Marcus K." },

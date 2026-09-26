@@ -2,6 +2,7 @@ import "./globals.css";
 import { Barlow } from "next/font/google";
 import PostHogProvider from "../components/PostHogProvider";
 import { ClerkProvider } from '@clerk/nextjs';
+import { dark } from '@clerk/themes';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -12,17 +13,28 @@ const barlow = Barlow({
 });
 
 export const metadata = {
-  title: "FitArena — Elite Gym Challenges",
-  description: "Compete, earn badges, climb leaderboards at your gym.",
+  title: "FitArena — Elite Gym Challenges & Live Leaderboards",
+  description: "The competitive gym operating system. Unlock daily station challenges via QR code, record verified personal bests, climb live gym leaderboards, and redeem earned XP.",
+  keywords: ["gym challenges", "fitness competition", "gym leaderboard", "workout tracking", "crossfit", "gym perks"],
+  authors: [{ name: "FitArena Team" }],
+  openGraph: {
+    title: "FitArena — Elite Gym Challenges & Live Leaderboards",
+    description: "Turn every workout into an elite competition. Daily QR station challenges, verified PBs, and live athlete ranks.",
+    type: "website",
+    siteName: "FitArena",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FitArena — Elite Gym Challenges",
+    description: "Compete, earn badges, climb leaderboards at your gym.",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  themeColor: "#0a0a0a",
 };
-
-import { dark } from '@clerk/themes';
 
 export default function RootLayout({ children }) {
   return (

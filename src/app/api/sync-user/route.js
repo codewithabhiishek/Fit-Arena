@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "../../../firebase/admin";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 
-export async function POST(req) {
+export async function POST() {
   try {
     const { userId } = await auth();
     

@@ -1,7 +1,7 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FitArena.jsx — Main app, UI identical to original, fully wired to Supabase
+// FitArena.jsx — Main app, UI identical to original, fully wired to Firebase Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
@@ -10,9 +10,11 @@ import { useAuth } from "../hooks/useAuth";
 import { useProfile } from "../hooks/useProfile";
 import { useChallenges } from "../hooks/useChallenges";
 import { useLeaderboard } from "../hooks/useLeaderboard";
-import { submitScore, getPendingSubmissions, approveSubmission, rejectSubmission } from "../services/submissionService";
+import { submitScore, getPendingSubmissions, approveSubmission, rejectSubmission, subscribeToSubmissions } from "../services/submissionService";
 import { createChallenge, deactivateChallenge, updateChallenge } from "../services/challengeService";
 import { updateUserProfile } from "../services/userService";
+import { db } from "../firebase/client";
+import { collection, query, where, getDocs, getCountFromServer } from "firebase/firestore";
 import { QRCodeSVG } from "qrcode.react";
 import { usePostHog } from "posthog-js/react";
 import LandingPage from "./LandingPage";
@@ -770,18 +772,25 @@ function ProfilePage({ profile, onSignOut, onProfileUpdated }) {
   const [redeemingId, setRedeemingId]   = useState(null);
   const [redeemErr,   setRedeemErr]     = useState(null);
 
-  // BUG FIX: Load existing redemptions from the DB on mount so they
-  // survive page refreshes (previously only stored in-memory state).
+  // Load existing redemptions from the DB on mount so they
+  // survive page refreshes.
   useEffect(() => {
     async function loadRedemptions() {
-      const { data } = await supabase
-        .from("redemptions")
-        .select("reward_id")
-        .eq("user_id", profile.id);
-      if (data) setRedeemedIds(new Set(data.map(r => r.reward_id)));
+      try {
+        const q = query(collection(db, "redemptions"), where("user_id", "==", profile.id));
+        const snap = await getDocs(q);
+        const ids = new Set();
+        snap.forEach(doc => {
+          const r = doc.data();
+          if (r.reward_id) ids.add(r.reward_id);
+        });
+        setRedeemedIds(ids);
+      } catch {
+        // keep existing set on failure
+      }
     }
-    loadRedemptions();
-  }, [profile.id]);
+    if (profile?.id) loadRedemptions();
+  }, [profile?.id]);
 
   const [dbRewards, setDbRewards] = useState([]);
   useEffect(() => {
@@ -792,18 +801,26 @@ function ProfilePage({ profile, onSignOut, onProfileUpdated }) {
       r3: "👕",
       r4: "💎",
     };
-    supabase
-      .from("rewards")
-      .select("*")
-      .then(({ data, error }) => {
-        if (active && !error && data && data.length > 0) {
-          setDbRewards(data.map(item => ({
-            ...item,
-            icon: REWARD_ICONS[item.id] || "🎁"
-          })));
+    async function loadRewards() {
+      try {
+        const snap = await getDocs(collection(db, "rewards"));
+        if (active && !snap.empty) {
+          const list = [];
+          snap.forEach(doc => {
+            const data = doc.data();
+            list.push({
+              id: doc.id,
+              ...data,
+              icon: REWARD_ICONS[doc.id] || data.icon || "🎁"
+            });
+          });
+          if (list.length > 0) setDbRewards(list);
         }
-      })
-      .catch(() => {});
+      } catch {
+        // fallback to static REWARDS
+      }
+    }
+    loadRewards();
     return () => { active = false; };
   }, []);
 
@@ -852,33 +869,32 @@ function ProfilePage({ profile, onSignOut, onProfileUpdated }) {
     setRedeemingId(r.id);
     setRedeemErr(null);
 
-    const { data: result, error } = await supabase.rpc("redeem_reward", {
-      p_reward_id: r.id,
-    });
+    try {
+      const res = await fetch("/api/redeem-reward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: r.cost, rewardId: r.id })
+      });
+      const result = await res.json();
 
-    if (error) {
-      setRedeemErr(error.message || "Redemption failed. Please try again.");
-      setRedeemingId(null);
-      return;
-    }
-
-    if (!result?.success) {
-      if (result?.error === "already_redeemed") {
-        setRedeemErr("You have already redeemed this reward.");
-        setRedeemedIds(prev => new Set([...prev, r.id]));
-      } else if (result?.error === "insufficient_points") {
-        setRedeemErr("Insufficient points. Your balance may have changed.");
-      } else {
-        setRedeemErr("This reward is not currently available.");
+      if (!res.ok) {
+        if (result?.error === "Insufficient points") {
+          setRedeemErr("Insufficient points. Your balance may have changed.");
+        } else {
+          setRedeemErr(result?.error || "Redemption failed. Please try again.");
+        }
+        setRedeemingId(null);
+        return;
       }
-      setRedeemingId(null);
-      return;
-    }
 
-    setRedeemedIds(prev => new Set([...prev, r.id]));
-    posthog?.capture("reward_redeemed", { reward_id: r.id, reward_title: r.title, cost: r.cost });
-    onProfileUpdated();
-    setRedeemingId(null);
+      setRedeemedIds(prev => new Set([...prev, r.id]));
+      posthog?.capture("reward_redeemed", { reward_id: r.id, reward_title: r.title, cost: r.cost });
+      onProfileUpdated();
+    } catch (err) {
+      setRedeemErr(err.message || "Redemption failed. Please try again.");
+    } finally {
+      setRedeemingId(null);
+    }
   }
 
   return (
@@ -1056,12 +1072,10 @@ function AdminPage({ userId, challenges, refetchChallenges }) {
 
     async function generateQR() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch("/api/generate-qr-token", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token || ""}`,
           },
           body: JSON.stringify({ challengeId: showQR }),
         });
@@ -1086,22 +1100,17 @@ function AdminPage({ userId, challenges, refetchChallenges }) {
       try {
         const today = new Date().toISOString().slice(0, 10);
 
-        const { count: subCount } = await supabase
-          .from("submissions")
-          .select("id", { count: "exact", head: true })
-          .gte("submitted_at", today);
+        const subQ = query(collection(db, "submissions"), where("submitted_at", ">=", today));
+        const subSnap = await getCountFromServer(subQ).catch(() => null);
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
-
-        const { count: memberCount } = await supabase
-          .from("users")
-          .select("id", { count: "exact", head: true })
-          .gte("last_active", thirtyDaysAgo.toISOString());
+        const memberQ = query(collection(db, "users"), where("last_active", ">=", thirtyDaysAgo.toISOString()));
+        const memberSnap = await getCountFromServer(memberQ).catch(() => null);
 
         setAnalyticsStats({
-          submissionsToday: subCount?.toString() ?? "—",
-          activeMembers: memberCount?.toString() ?? "—",
+          submissionsToday: subSnap ? subSnap.data().count.toString() : "—",
+          activeMembers: memberSnap ? memberSnap.data().count.toString() : "—",
         });
       } catch {
         // silently keep "—" on error
@@ -1126,45 +1135,24 @@ function AdminPage({ userId, challenges, refetchChallenges }) {
     setLoadingP(true);
     setLoadingErr(null);
 
-    getPendingSubmissions()
-      .then(rows => {
-        const filtered = (rows ?? []).filter(s => s.user_id !== userId);
-        setPending(filtered);
-      })
-      .catch(err => setLoadingErr(err?.message ?? "Failed to load submissions"))
-      .finally(() => setLoadingP(false));
+    function refreshSubmissions() {
+      getPendingSubmissions()
+        .then(rows => {
+          const filtered = (rows ?? []).filter(s => s.user_id !== userId);
+          setPending(filtered);
+        })
+        .catch(err => setLoadingErr(err?.message ?? "Failed to load submissions"))
+        .finally(() => setLoadingP(false));
+    }
 
-    // Real-time: refresh list on new submissions OR status changes
-    // (INSERT = new submission; UPDATE = another admin approved/rejected)
-    const channel = supabase
-      .channel("admin-submissions-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "submissions" },
-        () => {
-          getPendingSubmissions()
-            .then(rows => {
-              const filtered = (rows ?? []).filter(s => s.user_id !== userId);
-              setPending(filtered);
-            })
-            .catch(() => {});
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "submissions" },
-        () => {
-          getPendingSubmissions()
-            .then(rows => {
-              const filtered = (rows ?? []).filter(s => s.user_id !== userId);
-              setPending(filtered);
-            })
-            .catch(() => {});
-        }
-      )
-      .subscribe();
+    refreshSubmissions();
 
-    return () => supabase.removeChannel(channel);
+    // Real-time: refresh list on new submissions using Firestore subscription
+    const unsubscribe = subscribeToSubmissions(() => {
+      refreshSubmissions();
+    });
+
+    return () => unsubscribe();
   }, [tab, userId]);
 
 
