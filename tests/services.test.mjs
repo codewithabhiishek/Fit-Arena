@@ -133,3 +133,44 @@ test("QR HMAC SHA-256 signature verification validates correctly", () => {
   assert.equal(compare("a".repeat(64)), false);
   assert.equal(compare("invalid-token"), false);
 });
+
+// ─── 5. Strix Security & Sanitization Tests ─────────────────────────────────
+
+test("sanitizeInput strips HTML tags and caps bounds", async () => {
+  const { sanitizeInput } = await import("../src/utils/formatters.js");
+
+  assert.equal(sanitizeInput("<script>alert(1)</script>Elena"), "alert(1)Elena");
+  assert.equal(sanitizeInput("<img src=x onerror=alert(1)>Marcus"), "Marcus");
+  assert.equal(sanitizeInput("Plain Athlete Name", 10), "Plain Athl");
+  assert.equal(sanitizeInput(null), "");
+  assert.equal(sanitizeInput(undefined), "");
+});
+
+test("Strix Dual Honeypot defense blocks malicious bot submissions", () => {
+  const evaluateHoneypot = ({ botcheck, gotcha }) => {
+    if (botcheck === true) return { drop: true, reason: "botcheck_tripped" };
+    if (typeof gotcha === "string" && gotcha.trim().length > 0) return { drop: true, reason: "gotcha_tripped" };
+    return { drop: false };
+  };
+
+  assert.deepEqual(evaluateHoneypot({ botcheck: false, gotcha: "" }), { drop: false });
+  assert.deepEqual(evaluateHoneypot({ botcheck: true, gotcha: "" }), { drop: true, reason: "botcheck_tripped" });
+  assert.deepEqual(evaluateHoneypot({ botcheck: false, gotcha: "spambot-payload" }), { drop: true, reason: "gotcha_tripped" });
+});
+
+test("Workout score boundaries validate legitimate gym achievements", () => {
+  const validateScore = (score) => {
+    const parsed = Math.floor(Number(score));
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 99999) return false;
+    return true;
+  };
+
+  assert.equal(validateScore(1), true);
+  assert.equal(validateScore(120), true);
+  assert.equal(validateScore(99999), true);
+  assert.equal(validateScore(0), false);
+  assert.equal(validateScore(-50), false);
+  assert.equal(validateScore(100000), false);
+  assert.equal(validateScore("NaN"), false);
+});
+

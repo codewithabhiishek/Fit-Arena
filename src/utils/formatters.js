@@ -46,3 +46,29 @@ export function formatDeadline(date) {
   if (diff === 1) return "1 day left";
   return `${diff} days left`;
 }
+
+/**
+ * Strips HTML tags and caps input string length (Strix security).
+ * @param {string|null|undefined} raw
+ * @param {number} maxLen
+ * @returns {string}
+ */
+export function sanitizeInput(raw, maxLen = 50) {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/<[^>]*>?/gm, "").slice(0, maxLen);
+}
+
+/**
+ * Safe haptic vibration pulse for touch devices.
+ * @param {number|number[]} ms
+ */
+export function triggerHaptic(ms = 15) {
+  if (typeof window !== "undefined" && "navigator" in window && "vibrate" in navigator) {
+    try {
+      navigator.vibrate(ms);
+    } catch {
+      /* ignore if disabled or unsupported */
+    }
+  }
+}
+

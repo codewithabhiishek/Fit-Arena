@@ -99,6 +99,35 @@ src/
 
 ---
 
+## Testing & Quality Assurance
+
+Fit-Arena includes an automated Node test suite testing formatting utilities, Strix honeypots, input sanitization, and score boundaries.
+
+```bash
+# Run test suite (12 tests)
+npm test
+
+# Production build check
+npm run build
+```
+
+---
+
+## Security Hardening (Strix Standard)
+
+- **Dual Honeypot Protection**: Off-screen decoy fields (`name="_gotcha"`) and botcheck checkboxes (`name="botcheck"`) trap and silently disarm automated spam submissions.
+- **Input Sanitization**: Regex boundary stripping (`<[^>]*>?`) and max-length constraints across names and gym locations to prevent injection.
+- **Submission Cooldowns**: Cooldown locks and tactile feedback on challenge submissions.
+- **Zero Vulnerabilities**: Enforces strict overrides in `package.json` ensuring 0 CVE vulnerabilities across all production and development dependencies.
+
+---
+
+## Author & Creator
+
+Designed & engineered by [**Abhishek**](https://abhiishek.is-a.dev/) — explore more projects and experiments at [abhiishek.is-a.dev](https://abhiishek.is-a.dev/).
+
+---
+
 ## Known Remaining Items
 
 1. **Leaderboard periods** — tabs currently filter members active during the
@@ -110,3 +139,4 @@ src/
 3. **Email confirmation** — If Supabase email confirmation is enabled, users
    see a "Check your email" screen after signup. Make sure your Supabase
    project's email templates are configured.
+

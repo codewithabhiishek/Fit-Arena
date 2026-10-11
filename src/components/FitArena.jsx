@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, getCountFromServer } from "firebase/
 import { QRCodeSVG } from "qrcode.react";
 import { usePostHog } from "posthog-js/react";
 import LandingPage from "./LandingPage";
+import { sanitizeInput, triggerHaptic } from "../utils/formatters";
 
 // ─── STATIC DATA ─────────────────────────────────────────────────────────────
 // BADGES and REWARDS remain static (cosmetic/store data, not from DB yet)
@@ -337,6 +338,9 @@ function ChallengeDetail({ challenge, userId, onBack, onSubmitted }) {
   const [submitting, setSubmitting] = useState(false);
   const [confetti, setConfetti]   = useState(false);
   const [err, setErr]             = useState(null);
+  const [coolingDown, setCoolingDown] = useState(false);
+  const [botcheck, setBotcheck]   = useState(false);
+  const [gotcha, setGotcha]       = useState("");
 
   useEffect(()=>{
     async function go(){
@@ -356,13 +360,19 @@ function ChallengeDetail({ challenge, userId, onBack, onSubmitted }) {
   }, [challenge.id, challenge.title, challenge.type, fallback]);
 
   async function handleSubmit(){
+    // Strix Honeypot Protection: drop bot submissions
+    if (botcheck || (gotcha && gotcha.trim().length > 0)) return;
+    if (coolingDown) return;
     if (!score || !userId) return;
     const parsedScore = Math.floor(Number(score));
     if (!Number.isFinite(parsedScore) || parsedScore < 1 || parsedScore > 99999) {
       setErr("Score must be between 1 and 99,999.");
       return;
     }
+    triggerHaptic(25);
     setSubmitting(true); setErr(null);
+    setCoolingDown(true);
+    setTimeout(() => setCoolingDown(false), 2000);
     try {
       await submitScore({ userId, challengeId:challenge.id, score:parsedScore });
       posthog?.capture("score_submitted", { challenge_id: challenge.id, challenge_type: challenge.type, score: parsedScore });
@@ -377,7 +387,7 @@ function ChallengeDetail({ challenge, userId, onBack, onSubmitted }) {
   return (
     <div>
       <Confetti active={confetti} />
-      <button onClick={onBack} style={{ background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:13,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:20,display:"flex",alignItems:"center",gap:6,padding:0 }}>← Back</button>
+      <button onClick={() => { triggerHaptic(12); onBack(); }} style={{ background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:13,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:20,display:"flex",alignItems:"center",gap:6,padding:0 }}>← Back</button>
 
       <div style={{ ...S.card, background:`linear-gradient(135deg,#111,${challenge.color}11)`, borderColor:challenge.color+"33", textAlign:"center", padding:"32px 20px" }}>
         <div style={{ fontSize:64,marginBottom:12 }}>{challenge.icon}</div>
@@ -402,9 +412,30 @@ function ChallengeDetail({ challenge, userId, onBack, onSubmitted }) {
         <div style={S.card}>
           <div style={{ ...S.sTitle,marginTop:0 }}>Submit Today&apos;s Score</div>
           {err && <div style={S.errBox}>{err}</div>}
+          {/* Strix Dual Honeypot */}
+          <input
+            type="checkbox"
+            name="botcheck"
+            style={{ display: "none" }}
+            tabIndex={-1}
+            autoComplete="off"
+            checked={botcheck}
+            onChange={(e) => setBotcheck(e.target.checked)}
+            aria-hidden="true"
+          />
+          <input
+            type="text"
+            name="_gotcha"
+            style={{ display: "none" }}
+            tabIndex={-1}
+            autoComplete="off"
+            value={gotcha}
+            onChange={(e) => setGotcha(e.target.value)}
+            aria-hidden="true"
+          />
           <input style={{ ...S.input,marginBottom:12 }} type="number" min="1" max="99999" placeholder={`Enter ${challenge.type==="Plank"?"seconds":"reps"}...`} value={score} onChange={e=>setScore(e.target.value)} />
-          <button style={{ ...S.neonBtn,opacity:score&&!submitting?1:0.4 }} onClick={handleSubmit} disabled={!score||submitting}>
-            {submitting?"⏳ Submitting...":"🚀 Submit Score"}
+          <button style={{ ...S.neonBtn,opacity:score&&!submitting&&!coolingDown?1:0.4 }} onClick={handleSubmit} disabled={!score||submitting||coolingDown}>
+            {submitting?"⏳ Submitting...":coolingDown?"⏳ Cooldown...":"🚀 Submit Score"}
           </button>
         </div>
       ):(
@@ -909,7 +940,7 @@ function ProfilePage({ profile, onSignOut, onProfileUpdated }) {
             <input
               style={{ ...S.input,marginBottom:16 }}
               value={editName}
-              onChange={e=>setEditName(e.target.value)}
+              onChange={e=>setEditName(sanitizeInput(e.target.value, 50))}
               onKeyDown={handleKeyDown}
               placeholder="Your name"
               maxLength={50}
@@ -919,14 +950,14 @@ function ProfilePage({ profile, onSignOut, onProfileUpdated }) {
             <input
               style={{ ...S.input,marginBottom:24 }}
               value={editGym}
-              onChange={e=>setEditGym(e.target.value)}
+              onChange={e=>setEditGym(sanitizeInput(e.target.value, 60))}
               onKeyDown={handleKeyDown}
               placeholder="Your gym (optional)"
               maxLength={60}
             />
             <div style={{ display:"flex",gap:10 }}>
               <button
-                onClick={handleSave}
+                onClick={() => { triggerHaptic(20); handleSave(); }}
                 disabled={saving}
                 style={{ ...S.neonBtn,flex:1,opacity:saving?0.5:1 }}
               >
@@ -1638,8 +1669,29 @@ export default function FitArena() {
   return (
     <div style={S.app}>
       {/* Top bar */}
-      <div style={{ position:"fixed",top:0,left:0,right:0,height:48,background:"rgba(10,10,10,0.97)",borderBottom:"1px solid #1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",zIndex:90,backdropFilter:"blur(20px)" }}>
+      <div style={{ position:"fixed",top:0,left:0,right:0,height:48,background:"rgba(10,10,10,0.97)",borderBottom:"1px solid #1a1a1a",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",zIndex:90,backdropFilter:"blur(20px)" }}>
         <span style={{ fontSize:18,fontWeight:900,color:"#39FF14",letterSpacing:"-0.03em" }}>⚡ FitArena</span>
+        <a
+          href="https://abhiishek.is-a.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "#888",
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            textDecoration: "none",
+            border: "1px solid #222",
+            borderRadius: 6,
+            padding: "4px 9px",
+            transition: "all 0.15s"
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#39FF14"; e.currentTarget.style.borderColor = "#39FF14"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "#222"; }}
+        >
+          Creator ↗
+        </a>
       </div>
 
       {/* Pages */}
@@ -1664,7 +1716,7 @@ export default function FitArena() {
       {/* Bottom nav */}
       <nav style={S.nav}>
         {NAV.map(n=>(
-          <button key={n.id} onClick={()=>{ setPage(n.id); setChallenge(null); }} style={S.navBtn(page===n.id||(page==="challenge_detail"&&n.id==="challenges"))}>
+          <button key={n.id} onClick={()=>{ triggerHaptic(12); setPage(n.id); setChallenge(null); }} style={S.navBtn(page===n.id||(page==="challenge_detail"&&n.id==="challenges"))}>
             <span style={{ fontSize:20 }}>{n.icon}</span>
             <span>{n.label}</span>
           </button>

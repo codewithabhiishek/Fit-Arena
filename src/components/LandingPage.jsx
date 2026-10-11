@@ -60,6 +60,36 @@ export default function LandingPage({ onEnterAuth }) {
           </div>
 
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <a
+              href="https://abhiishek.is-a.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                border: "1px solid #333",
+                borderRadius: 8,
+                padding: "6px 12px",
+                color: "#888",
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                textDecoration: "none",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#39FF14";
+                e.currentTarget.style.color = "#39FF14";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#333";
+                e.currentTarget.style.color = "#888";
+              }}
+            >
+              Creator ↗
+            </a>
             <button
               onClick={() => onEnterAuth("login")}
               style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer", padding: "8px 12px" }}
@@ -195,6 +225,32 @@ export default function LandingPage({ onEnterAuth }) {
           </button>
         </div>
       </section>
+
+      {/* ── Footer ── */}
+      <footer style={{ maxWidth: 1080, margin: "40px auto 0", padding: "28px 20px 0", borderTop: "1px solid #1a1a1a", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>⚡</span>
+          <span style={{ fontSize: 15, fontWeight: 900, color: "#39FF14" }}>FitArena OS</span>
+          <span style={{ color: "#555", fontSize: 12 }}>— Compete · Verified Records · Real-Time Gym Ranks</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#777" }}>
+          <span>© {new Date().getFullYear()} FitArena</span>
+          <span>·</span>
+          <span>
+            Crafted by{" "}
+            <a
+              href="https://abhiishek.is-a.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#39FF14", textDecoration: "none", fontWeight: 700 }}
+              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+            >
+              Abhishek
+            </a>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
